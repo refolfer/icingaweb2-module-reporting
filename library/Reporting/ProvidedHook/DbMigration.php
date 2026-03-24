@@ -6,6 +6,7 @@
 namespace Icinga\Module\Reporting\ProvidedHook;
 
 use Icinga\Application\Hook\DbMigrationHook;
+use Icinga\Exception\ConfigurationError;
 use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model\Schema;
 use ipl\Orm\Query;
@@ -13,6 +14,17 @@ use ipl\Sql\Connection;
 
 class DbMigration extends DbMigrationHook
 {
+    public function getMigrations(): array
+    {
+        try {
+            return parent::getMigrations();
+        } catch (ConfigurationError $_) {
+            // The module can be installed before its backend resource exists.
+            // In that state, there are no actionable migrations yet.
+            return [];
+        }
+    }
+
     public function getName(): string
     {
         return $this->translate('Icinga Reporting');
