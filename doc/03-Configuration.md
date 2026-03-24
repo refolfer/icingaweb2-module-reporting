@@ -29,6 +29,20 @@ There are four permissions that can be used to control what can be managed by wh
 | reporting/templates  | Templates (create, edit, delete)  |
 | reporting/timeframes | Timeframes (create, edit, delete) |
 
+## Restrictions
+
+The module provides the `reporting/filter/objects` restriction. It uses the same
+filter expression syntax as Icinga DB and is applied during interactive report
+rendering and export to reportlets that expose a `filter` setting, such as host
+and service SLA reports.
+
+This can be used to limit report data to a subset of monitored objects, for
+example:
+
+```
+hostgroup.name=linux-servers
+```
+
 ## Icinga Reporting Daemon
 
 There is a daemon for generating and distributing reports on a schedule if configured:

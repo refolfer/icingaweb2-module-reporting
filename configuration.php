@@ -43,4 +43,9 @@ namespace Icinga\Module\Reporting {
         'reporting/timeframes',
         $this->translate('Allow managing timeframes')
     );
+
+    $this->provideRestriction(
+        'reporting/filter/objects',
+        $this->translate('Restrict access to the monitored objects that match the filter')
+    );
 }

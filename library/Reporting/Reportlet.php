@@ -56,6 +56,14 @@ class Reportlet
     }
 
     /**
+     * @return  array
+     */
+    public function getRuntimeConfig()
+    {
+        return Restrictions::applyToReportletConfig($this->config, $this->class);
+    }
+
+    /**
      * @return  \Icinga\Module\Reporting\Hook\ReportHook
      */
     public function getImplementation()

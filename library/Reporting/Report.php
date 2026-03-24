@@ -188,7 +188,7 @@ class Report
         foreach ($this->getReportlets() as $reportlet) {
             $implementation = $reportlet->getImplementation();
 
-            $html->add($implementation->getHtml($timerange, $reportlet->getConfig()));
+            $html->add($implementation->getHtml($timerange, $reportlet->getRuntimeConfig()));
         }
 
         return $html;
@@ -206,14 +206,14 @@ class Report
 
         foreach ($this->getReportlets() as $reportlet) {
             $implementation = $reportlet->getImplementation();
+            $config = $reportlet->getRuntimeConfig();
 
             if ($implementation->providesData()) {
-                $data = $implementation->getData($timerange, $reportlet->getConfig());
+                $data = $implementation->getData($timerange, $config);
                 $csv[] = array_merge($data->getDimensions(), $data->getValues());
 
                 $hosts = [];
                 $isServiceExport = false;
-                $config = $reportlet->getConfig();
                 $exportTotalEnabled = isset($config['export_total']) && $config['export_total'];
                 if ($exportTotalEnabled) {
                     $isServiceExport = $reportlet->getClass() === ServiceSlaReport::class;
@@ -265,15 +265,15 @@ class Report
 
         foreach ($this->getReportlets() as $reportlet) {
             $implementation = $reportlet->getImplementation();
+            $config = $reportlet->getRuntimeConfig();
 
             if ($implementation->providesData()) {
-                $data = $implementation->getData($timerange, $reportlet->getConfig());
+                $data = $implementation->getData($timerange, $config);
                 $dimensions = $data->getDimensions();
                 $values = $data->getValues();
 
                 $hosts = [];
                 $isServiceExport = false;
-                $config = $reportlet->getConfig();
                 $exportTotalEnabled = isset($config['export_total']) && $config['export_total'];
                 if ($exportTotalEnabled) {
                     $isServiceExport = $reportlet->getClass() === ServiceSlaReport::class;
