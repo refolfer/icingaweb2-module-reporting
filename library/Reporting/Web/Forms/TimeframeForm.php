@@ -122,7 +122,12 @@ class TimeframeForm extends CompatForm
 
             $start = $this->getValue('start');
             if (! $start instanceof DateTime) {
-                $start = new DateTime($start);
+                try {
+                    $start = new DateTime($start);
+                } catch (Exception $_) {
+                    // The start field already reports its own validation error.
+                    return true;
+                }
             }
 
             if ($value <= $start) {

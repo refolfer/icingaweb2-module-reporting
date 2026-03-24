@@ -5,7 +5,6 @@
 
 namespace Icinga\Module\Reporting\Controllers;
 
-use Exception;
 use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model;
 use Icinga\Module\Reporting\Timeframe;
@@ -29,7 +28,7 @@ class TimeframeController extends Controller
             ->first();
 
         if ($timeframe === null) {
-            throw new Exception('Timeframe not found');
+            $this->httpNotFound($this->translate('Timeframe not found'));
         }
 
         $this->timeframe = Timeframe::fromModel($timeframe);

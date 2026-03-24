@@ -6,7 +6,6 @@
 namespace Icinga\Module\Reporting\Controllers;
 
 use DateTime;
-use Exception;
 use GuzzleHttp\Psr7\ServerRequest;
 use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model;
@@ -36,7 +35,7 @@ class TemplateController extends Controller
             ->first();
 
         if ($template === null) {
-            throw new Exception('Template not found');
+            $this->httpNotFound($this->translate('Template not found'));
         }
 
         $this->template = $template;

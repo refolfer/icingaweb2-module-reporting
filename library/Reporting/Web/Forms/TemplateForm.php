@@ -10,6 +10,7 @@ use GuzzleHttp\Psr7\UploadedFile;
 use Icinga\Authentication\Auth;
 use Icinga\Module\Reporting\Database;
 use Icinga\Util\Json;
+use RuntimeException;
 use ipl\Html\Html;
 use ipl\Html\HtmlDocument;
 use ipl\Validator\CallbackValidator;
@@ -242,7 +243,7 @@ class TemplateForm extends CompatForm
                 ], ['id = ?' => $this->template->id]);
             }
         } catch (Exception $e) {
-            die($e->getMessage());
+            throw new RuntimeException($this->translate('Failed to save template'), 0, $e);
         }
     }
 
