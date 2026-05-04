@@ -31,10 +31,21 @@ There are four permissions that can be used to control what can be managed by wh
 
 ## Restrictions
 
-The module provides the `reporting/filter/objects` restriction. It uses the same
-filter expression syntax as Icinga DB and is applied during interactive report
-rendering and export to reportlets that expose a `filter` setting, such as host
-and service SLA reports.
+The module provides the following restrictions:
+
+| Restriction                | Applies to                                                 |
+|----------------------------|------------------------------------------------------------|
+| reporting/users            | Reporting access for the listed users                      |
+| reporting/groups           | Reporting access for members of the listed groups          |
+| reporting/filter/objects   | Monitored objects that match the filter                    |
+
+`reporting/users` and `reporting/groups` accept comma-separated or line-separated
+values. If neither restriction is configured, access to reporting is not limited
+by user or group. Use `*` in either restriction to allow every authenticated user.
+
+`reporting/filter/objects` uses the same filter expression syntax as Icinga DB
+and is applied during interactive report rendering and export to reportlets that
+expose a `filter` setting, such as host and service SLA reports.
 
 This can be used to limit report data to a subset of monitored objects, for
 example:

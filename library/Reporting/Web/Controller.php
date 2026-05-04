@@ -5,8 +5,18 @@
 
 namespace Icinga\Module\Reporting\Web;
 
+use Icinga\Module\Reporting\Restrictions;
+use Icinga\Security\SecurityException;
 use ipl\Web\Compat\CompatController;
 
 class Controller extends CompatController
 {
+    public function init(): void
+    {
+        parent::init();
+
+        if (! Restrictions::hasAccess()) {
+            throw new SecurityException($this->translate('No permission to access reporting'));
+        }
+    }
 }

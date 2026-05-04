@@ -8,6 +8,8 @@ namespace Icinga\Module\Reporting\Controllers;
 use Icinga\Application\Config;
 use Icinga\Module\Reporting\Forms\ConfigureMailForm;
 use Icinga\Module\Reporting\Forms\SelectBackendForm;
+use Icinga\Module\Reporting\Restrictions;
+use Icinga\Security\SecurityException;
 use Icinga\Web\Controller;
 
 class ConfigController extends Controller
@@ -15,6 +17,10 @@ class ConfigController extends Controller
     public function init(): void
     {
         $this->assertPermission('config/modules');
+
+        if (! Restrictions::hasAccess()) {
+            throw new SecurityException($this->translate('No permission to access reporting'));
+        }
 
         parent::init();
     }

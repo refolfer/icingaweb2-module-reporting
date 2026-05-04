@@ -32,6 +32,8 @@ class ReportController extends Controller
 
     public function init(): void
     {
+        parent::init();
+
         $reportId = $this->params->getRequired('id');
 
         /** @var Model\Report $report */

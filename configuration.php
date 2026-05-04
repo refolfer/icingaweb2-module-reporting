@@ -48,4 +48,14 @@ namespace Icinga\Module\Reporting {
         'reporting/filter/objects',
         $this->translate('Restrict access to the monitored objects that match the filter')
     );
+
+    $this->provideRestriction(
+        'reporting/users',
+        $this->translate('Restrict access to reporting to the listed users')
+    );
+
+    $this->provideRestriction(
+        'reporting/groups',
+        $this->translate('Restrict access to reporting to members of the listed groups')
+    );
 }

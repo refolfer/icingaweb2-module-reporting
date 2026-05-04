@@ -11,6 +11,8 @@ use Icinga\Authentication\Auth;
 final class Restrictions
 {
     public const FILTER_OBJECTS = 'reporting/filter/objects';
+    public const USERS = 'reporting/users';
+    public const GROUPS = 'reporting/groups';
 
     private function __construct()
     {
@@ -41,6 +43,39 @@ final class Restrictions
         $config['filter'] = self::mergeFilters($config['filter'] ?? null, $restrictionFilter);
 
         return $config;
+    }
+
+    public static function hasAccess(): bool
+    {
+        try {
+            $auth = Auth::getInstance();
+            $user = $auth->getUser();
+        } catch (Exception $_) {
+            return true;
+        }
+
+        if ($user === null || $user->isUnrestricted()) {
+            return true;
+        }
+
+        $users = self::normalizeAccessRestrictions($user->getRestrictions(self::USERS));
+        $groups = self::normalizeAccessRestrictions($user->getRestrictions(self::GROUPS));
+
+        if (empty($users) && empty($groups)) {
+            return true;
+        }
+
+        $username = strtolower($user->getUsername());
+        if (in_array('*', $users, true) || in_array($username, $users, true)) {
+            return true;
+        }
+
+        $userGroups = array_map('strtolower', $user->getGroups());
+        if (in_array('*', $groups, true) || ! empty(array_intersect($userGroups, $groups))) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -116,5 +151,34 @@ final class Restrictions
     {
         return $reportletClass !== null
             && strpos($reportletClass, 'Icinga\\Module\\Icingadb\\ProvidedHook\\Reporting\\') === 0;
+    }
+
+    /**
+     * @param mixed $restrictions
+     *
+     * @return string[]
+     */
+    private static function normalizeAccessRestrictions($restrictions): array
+    {
+        if ($restrictions === null || $restrictions === '') {
+            return [];
+        }
+
+        if (! is_array($restrictions)) {
+            $restrictions = [$restrictions];
+        }
+
+        $values = [];
+        foreach ($restrictions as $restriction) {
+            $parts = preg_split('/[,\r\n]+/', (string) $restriction) ?: [];
+            foreach ($parts as $value) {
+                $value = strtolower(trim($value));
+                if ($value !== '') {
+                    $values[$value] = $value;
+                }
+            }
+        }
+
+        return array_values($values);
     }
 }
