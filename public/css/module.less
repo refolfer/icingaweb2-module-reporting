@@ -159,6 +159,77 @@
   text-align: center;
 }
 
+.sla-chart-balance-columns {
+  align-items: start;
+  display: flex;
+  gap: .75em;
+  overflow-x: auto;
+  padding-bottom: .5em;
+}
+
+.sla-chart-balance-column {
+  align-items: center;
+  display: flex;
+  flex: 0 0 6em;
+  flex-direction: column;
+  gap: .35em;
+}
+
+.sla-chart-balance-track {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  height: 16em;
+  width: 2.5em;
+}
+
+.sla-chart-balance-half {
+  background: @gray-lighter;
+  display: flex;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+.sla-chart-balance-positive {
+  align-items: end;
+  border-radius: .25em .25em 0 0;
+}
+
+.sla-chart-balance-negative {
+  align-items: start;
+  border-radius: 0 0 .25em .25em;
+}
+
+.sla-chart-balance-axis {
+  background: @text-color;
+  flex: 0 0 1px;
+}
+
+.sla-chart-balance-bar {
+  width: 100%;
+
+  &.ok {
+    background: @color-ok;
+  }
+
+  &.nok {
+    background: @color-critical;
+  }
+}
+
+.sla-chart-balance-value {
+  font-weight: bold;
+  white-space: nowrap;
+
+  &.ok {
+    color: @color-ok;
+  }
+
+  &.nok {
+    color: @color-critical;
+  }
+}
+
 .sla-chart-gauge,
 .sla-chart-gauge-summary {
   align-items: center;

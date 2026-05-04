@@ -20,6 +20,7 @@ final class SlaChart
     public const TABLE = 'table';
     public const BARS = 'bars';
     public const COLUMNS = 'columns';
+    public const BALANCE_COLUMNS = 'balance_columns';
     public const GAUGE = 'gauge';
 
     private function __construct()
@@ -46,10 +47,11 @@ final class SlaChart
     public static function getOptions(): array
     {
         return [
-            self::TABLE   => t('Table'),
-            self::BARS    => t('Horizontal Bars'),
-            self::COLUMNS => t('Columns'),
-            self::GAUGE   => t('Pie Charts')
+            self::TABLE           => t('Table'),
+            self::BARS            => t('Horizontal Bars'),
+            self::COLUMNS         => t('Columns'),
+            self::BALANCE_COLUMNS => t('Availability Balance Columns'),
+            self::GAUGE           => t('Pie Charts')
         ];
     }
 
@@ -69,6 +71,8 @@ final class SlaChart
         switch (self::getType($config)) {
             case self::COLUMNS:
                 return self::renderColumns($data, $config);
+            case self::BALANCE_COLUMNS:
+                return self::renderBalanceColumns($data, $config);
             case self::GAUGE:
                 return self::renderGauge($data, $config, $report instanceof HostSlaReport);
             case self::BARS:
@@ -154,6 +158,42 @@ final class SlaChart
         return (new HtmlDocument())
             ->addHtml(self::renderSummary($data, $config))
             ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-columns'], $columns));
+    }
+
+    private static function renderBalanceColumns(ReportData $data, array $config): HtmlDocument
+    {
+        $precision = self::getPrecision($config);
+        $columns = [];
+
+        foreach ($data->getRows() as $row) {
+            $sla = self::normalizeSla((float) $row->getValues()[0]);
+            $unavailable = 100 - $sla;
+
+            $columns[] = Html::tag('div', ['class' => 'sla-chart-balance-column'], [
+                Html::tag('div', ['class' => 'sla-chart-balance-value ok'], self::formatSla($sla, $precision)),
+                Html::tag('div', ['class' => 'sla-chart-balance-track'], [
+                    Html::tag('div', ['class' => 'sla-chart-balance-half sla-chart-balance-positive'], [
+                        Html::tag('div', [
+                            'class' => 'sla-chart-balance-bar ok',
+                            'style' => sprintf('height: %s%%', self::formatNumber($sla, 2))
+                        ])
+                    ]),
+                    Html::tag('div', ['class' => 'sla-chart-balance-axis']),
+                    Html::tag('div', ['class' => 'sla-chart-balance-half sla-chart-balance-negative'], [
+                        Html::tag('div', [
+                            'class' => 'sla-chart-balance-bar nok',
+                            'style' => sprintf('height: %s%%', self::formatNumber($unavailable, 2))
+                        ])
+                    ])
+                ]),
+                Html::tag('div', ['class' => 'sla-chart-balance-value nok'], self::formatSla($unavailable, $precision)),
+                Html::tag('div', ['class' => 'sla-chart-column-label'], self::formatDimensions($row->getDimensions()))
+            ]);
+        }
+
+        return (new HtmlDocument())
+            ->addHtml(self::renderSummary($data, $config))
+            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-balance-columns'], $columns));
     }
 
     private static function renderGauge(ReportData $data, array $config, bool $isHostReport): HtmlDocument

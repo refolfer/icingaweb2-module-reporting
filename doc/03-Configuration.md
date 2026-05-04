@@ -49,8 +49,8 @@ expose a `filter` setting, such as host and service SLA reports.
 
 For SLA reports, the report form also provides an `SLA Visualization` option.
 It controls the HTML and PDF presentation of the report and can show SLA results
-as the default table, horizontal bars, columns or pie charts. CSV and JSON
-exports continue to use tabular data.
+as the default table, horizontal bars, columns, availability balance columns or
+pie charts. CSV and JSON exports continue to use tabular data.
 
 This can be used to limit report data to a subset of monitored objects, for
 example:
