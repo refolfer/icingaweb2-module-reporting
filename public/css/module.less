@@ -177,6 +177,7 @@
   background: conic-gradient(@color-ok var(--sla-angle), @color-critical 0);
   border-radius: 50%;
   display: flex;
+  flex: 0 0 auto;
   height: 14em;
   justify-content: center;
   width: 14em;
@@ -201,18 +202,18 @@
   strong {
     font-size: 2em;
   }
+}
 
-  .sla-chart-gauge-ring-small & {
-    height: 5em;
-    width: 5em;
+.sla-chart-gauge-ring-small .sla-chart-gauge-center {
+  height: 5em;
+  width: 5em;
 
-    strong {
-      font-size: 1.2em;
-    }
+  strong {
+    font-size: 1.2em;
+  }
 
-    span {
-      font-size: .9em;
-    }
+  span {
+    font-size: .9em;
   }
 }
 
