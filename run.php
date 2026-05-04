@@ -12,6 +12,7 @@ namespace Icinga\Module\Reporting {
     $this->provideHook('DbMigration', '\\Icinga\\Module\\Reporting\\ProvidedHook\\DbMigration');
 
     $this->provideHook('reporting/Report', '\\Icinga\\Module\\Reporting\\Reports\\SystemReport');
+    $this->provideHook('reporting/Report', '\\Icinga\\Module\\Reporting\\Reports\\OutageReport');
 
     $this->provideHook('reporting/Action', '\\Icinga\\Module\\Reporting\\Actions\\SendMail');
 
