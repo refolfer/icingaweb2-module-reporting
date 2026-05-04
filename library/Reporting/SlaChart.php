@@ -49,7 +49,7 @@ final class SlaChart
             self::TABLE   => t('Table'),
             self::BARS    => t('Horizontal Bars'),
             self::COLUMNS => t('Columns'),
-            self::GAUGE   => t('Average Gauge')
+            self::GAUGE   => t('Pie Charts')
         ];
     }
 
@@ -161,31 +161,74 @@ final class SlaChart
         $threshold = self::getThreshold($config);
         $precision = self::getPrecision($config);
         $average = self::normalizeSla((float) $data->getAverages()[0]);
-        $slaClass = self::getSlaClass($average, $threshold);
-        $angle = self::formatNumber($average * 3.6, 2);
         $total = $isHostReport
             ? sprintf(t('%d Hosts'), $data->count())
             : sprintf(t('%d Services'), $data->count());
+        $charts = [];
 
-        return (new HtmlDocument())->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge'], [
-            Html::tag(
-                'div',
-                [
-                    'class' => "sla-chart-gauge-ring $slaClass",
-                    'style' => sprintf('--sla-angle: %sdeg', $angle)
-                ],
-                Html::tag('div', ['class' => 'sla-chart-gauge-center'], [
-                    Html::tag('strong', null, self::formatSla($average, $precision)),
-                    Html::tag('span', null, t('Average SLA'))
+        foreach ($data->getRows() as $row) {
+            $sla = self::normalizeSla((float) $row->getValues()[0]);
+
+            $charts[] = Html::tag('div', ['class' => 'sla-chart-gauge-item'], [
+                self::renderGaugeRing(
+                    $sla,
+                    $precision,
+                    t('SLA'),
+                    self::getSlaClass($sla, $threshold),
+                    'sla-chart-gauge-ring-small'
+                ),
+                Html::tag('div', ['class' => 'sla-chart-gauge-label'], self::formatDimensions($row->getDimensions())),
+                Html::tag('div', ['class' => 'sla-chart-gauge-split'], [
+                    Html::tag('span', ['class' => 'ok'], self::formatSla($sla, $precision)),
+                    Html::tag('span', ['class' => 'nok'], self::formatSla(100 - $sla, $precision))
                 ])
-            ),
-            Html::tag('dl', ['class' => 'sla-chart-gauge-details'], [
-                Html::tag('dt', null, t('Objects')),
-                Html::tag('dd', null, $total),
-                Html::tag('dt', null, t('Threshold')),
-                Html::tag('dd', null, self::formatSla($threshold, $precision))
+            ]);
+        }
+
+        return (new HtmlDocument())
+            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge'], [
+                self::renderGaugeRing(
+                    $average,
+                    $precision,
+                    t('Average SLA'),
+                    self::getSlaClass($average, $threshold)
+                ),
+                Html::tag('dl', ['class' => 'sla-chart-gauge-details'], [
+                    Html::tag('dt', null, t('Objects')),
+                    Html::tag('dd', null, $total),
+                    Html::tag('dt', null, t('Available')),
+                    Html::tag('dd', ['class' => 'ok'], self::formatSla($average, $precision)),
+                    Html::tag('dt', null, t('Unavailable')),
+                    Html::tag('dd', ['class' => 'nok'], self::formatSla(100 - $average, $precision)),
+                    Html::tag('dt', null, t('Threshold')),
+                    Html::tag('dd', null, self::formatSla($threshold, $precision))
+                ])
+            ]))
+            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge-grid'], $charts));
+    }
+
+    private static function renderGaugeRing(
+        float $sla,
+        int $precision,
+        string $label,
+        string $slaClass,
+        string $sizeClass = ''
+    ): ValidHtml
+    {
+        $angle = self::formatNumber($sla * 3.6, 2);
+        $class = trim("sla-chart-gauge-ring $sizeClass $slaClass");
+
+        return Html::tag(
+            'div',
+            [
+                'class' => $class,
+                'style' => sprintf('--sla-angle: %sdeg', $angle)
+            ],
+            Html::tag('div', ['class' => 'sla-chart-gauge-center'], [
+                Html::tag('strong', null, self::formatSla($sla, $precision)),
+                Html::tag('span', null, $label)
             ])
-        ]));
+        );
     }
 
     private static function renderSummary(ReportData $data, array $config): ValidHtml

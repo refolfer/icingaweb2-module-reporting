@@ -169,19 +169,17 @@
 .sla-chart-gauge-ring {
   --sla-angle: 0deg;
   align-items: center;
+  background: conic-gradient(@color-ok var(--sla-angle), @color-critical 0);
   border-radius: 50%;
   display: flex;
   height: 14em;
   justify-content: center;
   width: 14em;
+}
 
-  &.ok {
-    background: conic-gradient(@color-ok var(--sla-angle), @gray-lighter 0);
-  }
-
-  &.nok {
-    background: conic-gradient(@color-critical var(--sla-angle), @gray-lighter 0);
-  }
+.sla-chart-gauge-ring-small {
+  height: 8em;
+  width: 8em;
 }
 
 .sla-chart-gauge-center {
@@ -198,6 +196,19 @@
   strong {
     font-size: 2em;
   }
+
+  .sla-chart-gauge-ring-small & {
+    height: 5em;
+    width: 5em;
+
+    strong {
+      font-size: 1.2em;
+    }
+
+    span {
+      font-size: .9em;
+    }
+  }
 }
 
 .sla-chart-gauge-details {
@@ -209,6 +220,47 @@
   dd {
     font-weight: bold;
     margin: 0;
+
+    &.ok {
+      color: @color-ok;
+    }
+
+    &.nok {
+      color: @color-critical;
+    }
+  }
+}
+
+.sla-chart-gauge-grid {
+  display: grid;
+  gap: 1.5em;
+  grid-template-columns: repeat(auto-fit, minmax(9em, 1fr));
+}
+
+.sla-chart-gauge-item {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: .5em;
+}
+
+.sla-chart-gauge-label {
+  max-width: 12em;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.sla-chart-gauge-split {
+  display: flex;
+  gap: .75em;
+  font-weight: bold;
+
+  .ok {
+    color: @color-ok;
+  }
+
+  .nok {
+    color: @color-critical;
   }
 }
 
