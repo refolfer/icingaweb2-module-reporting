@@ -164,6 +164,7 @@ final class SlaChart
         $total = $isHostReport
             ? sprintf(t('%d Hosts'), $data->count())
             : sprintf(t('%d Services'), $data->count());
+        $objectLabel = $isHostReport ? t('Host SLA') : t('Service SLA');
         $charts = [];
 
         foreach ($data->getRows() as $row) {
@@ -173,7 +174,7 @@ final class SlaChart
                 self::renderGaugeRing(
                     $sla,
                     $precision,
-                    t('SLA'),
+                    $objectLabel,
                     self::getSlaClass($sla, $threshold),
                     'sla-chart-gauge-ring-small'
                 ),
@@ -186,7 +187,8 @@ final class SlaChart
         }
 
         return (new HtmlDocument())
-            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge'], [
+            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge-grid'], $charts))
+            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge-summary'], [
                 self::renderGaugeRing(
                     $average,
                     $precision,
@@ -203,8 +205,7 @@ final class SlaChart
                     Html::tag('dt', null, t('Threshold')),
                     Html::tag('dd', null, self::formatSla($threshold, $precision))
                 ])
-            ]))
-            ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-gauge-grid'], $charts));
+            ]));
     }
 
     private static function renderGaugeRing(
