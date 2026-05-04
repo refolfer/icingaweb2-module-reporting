@@ -53,6 +53,15 @@ class OutageReport extends ReportHook
             'description' => t('Optional case-insensitive text filter for host or service names')
         ]);
 
+        $form->addElement('select', 'outage_service_state', [
+            'label'       => t('Service Outage State'),
+            'description' => t('Choose which service states should count as outages'),
+            'options'     => [
+                'critical' => t('Critical and Unknown'),
+                'warning'  => t('Warning, Critical and Unknown')
+            ]
+        ]);
+
         $form->addElement('number', 'outage_limit', [
             'label'       => t('Object Limit'),
             'description' => t('Maximum number of hosts and services included in the report'),
@@ -123,12 +132,14 @@ class OutageReport extends ReportHook
     {
         $start = $timerange->getStart()->getTimestamp();
         $end = $timerange->getEnd()->getTimestamp();
-        $candidates = $this->fetchCandidates($start, $end, $config);
+        $historyStart = $start * 1000;
+        $historyEnd = $end * 1000;
+        $candidates = $this->fetchCandidates($historyStart, $historyEnd, $config);
         $objects = [];
 
         foreach ($candidates as $candidate) {
-            $events = $this->fetchEvents($candidate, $start, $end);
-            $object = $this->buildObject($candidate, $events, $start, $end);
+            $events = $this->fetchEvents($candidate, $historyStart, $historyEnd);
+            $object = $this->buildObject($candidate, $events, $start, $end, $config);
 
             if ($object['outage_seconds'] > 0) {
                 $objects[] = $object;
@@ -149,7 +160,7 @@ class OutageReport extends ReportHook
     /**
      * @return array<int, array<string, string|int>>
      */
-    private function fetchCandidates(int $start, int $end, array $config): array
+    private function fetchCandidates(int $historyStart, int $historyEnd, array $config): array
     {
         $type = $config['outage_object_type'] ?? self::TYPE_ALL;
         $limit = $this->getLimit($config) * 4;
@@ -158,7 +169,7 @@ class OutageReport extends ReportHook
         if ($type === self::TYPE_ALL || $type === self::TYPE_HOST) {
             $rows = array_merge(
                 $rows,
-                $this->fetchHostHistoryCandidates($start, $end, $config, $limit),
+                $this->fetchHostHistoryCandidates($historyStart, $historyEnd, $config, $limit),
                 $this->fetchCurrentHostCandidates($config, $limit)
             );
         }
@@ -166,7 +177,7 @@ class OutageReport extends ReportHook
         if ($type === self::TYPE_ALL || $type === self::TYPE_SERVICE) {
             $rows = array_merge(
                 $rows,
-                $this->fetchServiceHistoryCandidates($start, $end, $config, $limit),
+                $this->fetchServiceHistoryCandidates($historyStart, $historyEnd, $config, $limit),
                 $this->fetchCurrentServiceCandidates($config, $limit)
             );
         }
@@ -195,11 +206,11 @@ class OutageReport extends ReportHook
     /**
      * @return array<int, array<string, string|int>>
      */
-    private function fetchHostHistoryCandidates(int $start, int $end, array $config, int $limit): array
+    private function fetchHostHistoryCandidates(int $historyStart, int $historyEnd, array $config, int $limit): array
     {
         $filter = $this->getFilter($config);
         $where = "sh.object_type = 'host' AND sh.event_time > ? AND sh.event_time < ?";
-        $params = [$start, $end];
+        $params = [$historyStart, $historyEnd];
 
         if ($filter !== '') {
             $where .= ' AND LOWER(h.display_name) LIKE ?';
@@ -248,11 +259,12 @@ class OutageReport extends ReportHook
     /**
      * @return array<int, array<string, string|int>>
      */
-    private function fetchServiceHistoryCandidates(int $start, int $end, array $config, int $limit): array
+    private function fetchServiceHistoryCandidates(int $historyStart, int $historyEnd, array $config, int $limit): array
     {
         $filter = $this->getFilter($config);
+        $serviceOutageState = $this->getServiceOutageState($config);
         $where = "sh.object_type = 'service' AND sh.event_time > ? AND sh.event_time < ?";
-        $params = [$start, $end];
+        $params = [$historyStart, $historyEnd];
 
         if ($filter !== '') {
             $where .= ' AND LOWER(CONCAT(h.display_name, ?, s.display_name)) LIKE ?';
@@ -265,7 +277,7 @@ class OutageReport extends ReportHook
             "SELECT 'service' AS object_type, %s AS host_id, %s AS service_id,"
             . " CONCAT(h.display_name, ' / ', s.display_name) AS label,"
             . ' NULL AS current_state,'
-            . " SUM(CASE WHEN sh.hard_state > 1 THEN 1 ELSE 0 END) AS problem_events"
+            . " SUM(CASE WHEN sh.hard_state >= $serviceOutageState THEN 1 ELSE 0 END) AS problem_events"
             . ' FROM state_history sh'
             . ' INNER JOIN host h ON h.id = sh.host_id'
             . ' INNER JOIN service s ON s.id = sh.service_id'
@@ -284,7 +296,7 @@ class OutageReport extends ReportHook
     private function fetchCurrentServiceCandidates(array $config, int $limit): array
     {
         $filter = $this->getFilter($config);
-        $where = 'ss.hard_state > 1';
+        $where = sprintf('ss.hard_state >= %d', $this->getServiceOutageState($config));
         $params = [];
 
         if ($filter !== '') {
@@ -336,7 +348,7 @@ class OutageReport extends ReportHook
      *
      * @return array<int, object>
      */
-    private function fetchEvents(array $candidate, int $start, int $end): array
+    private function fetchEvents(array $candidate, int $historyStart, int $historyEnd): array
     {
         $objectType = $candidate['object_type'];
         $hostCondition = sprintf('sh.host_id = %s', $this->binaryExpression());
@@ -352,9 +364,9 @@ class OutageReport extends ReportHook
             $sameObject .= ' AND prev.service_id IS NULL';
         }
 
-        $params[] = $end;
-        $params[] = $start;
-        $params[] = $start;
+        $params[] = $historyEnd;
+        $params[] = $historyStart;
+        $params[] = $historyStart;
 
         $sql = "SELECT sh.event_time, sh.hard_state, sh.previous_hard_state, sh.output, sh.long_output"
             . ' FROM state_history sh'
@@ -373,7 +385,7 @@ class OutageReport extends ReportHook
      *
      * @return array<string, mixed>
      */
-    private function buildObject(array $candidate, array $events, int $start, int $end): array
+    private function buildObject(array $candidate, array $events, int $start, int $end, array $config): array
     {
         $state = $candidate['current_state'] ?? 0;
         $output = '';
@@ -381,9 +393,10 @@ class OutageReport extends ReportHook
         $segments = [];
 
         foreach ($events as $event) {
-            $eventTime = max($start, min($end, (int) $event->event_time));
+            $eventTime = $this->historyTimeToTimestamp((int) $event->event_time);
+            $eventTime = max($start, min($end, $eventTime));
 
-            if ((int) $event->event_time <= $start) {
+            if ($this->historyTimeToTimestamp((int) $event->event_time) <= $start) {
                 $state = (int) $event->hard_state;
                 $output = $this->formatOutput($event);
                 continue;
@@ -405,7 +418,7 @@ class OutageReport extends ReportHook
         $outages = [];
         $outageSeconds = 0;
         foreach ($segments as $segment) {
-            if ($this->isOutageState($candidate['object_type'], $segment['state'])) {
+            if ($this->isOutageState($candidate['object_type'], $segment['state'], $config)) {
                 $outages[] = $segment;
                 $outageSeconds += $segment['duration'];
             }
@@ -414,16 +427,17 @@ class OutageReport extends ReportHook
         $duration = max(1, $end - $start);
 
         return [
-            'type'            => $candidate['object_type'],
-            'type_label'      => $candidate['object_type'] === self::TYPE_HOST ? t('Host') : t('Service'),
-            'label'           => $candidate['label'],
-            'segments'        => $segments,
-            'outages'         => $outages,
-            'outage_count'    => count($outages),
-            'outage_seconds'  => $outageSeconds,
-            'outage_percent'  => round($outageSeconds / $duration * 100, 4),
-            'availability'    => round((1 - $outageSeconds / $duration) * 100, 4),
-            'longest_outage'  => empty($outages) ? 0 : max(array_column($outages, 'duration'))
+            'type'                 => $candidate['object_type'],
+            'type_label'           => $candidate['object_type'] === self::TYPE_HOST ? t('Host') : t('Service'),
+            'service_outage_state' => $this->getServiceOutageState($config),
+            'label'                => $candidate['label'],
+            'segments'             => $segments,
+            'outages'              => $outages,
+            'outage_count'         => count($outages),
+            'outage_seconds'       => $outageSeconds,
+            'outage_percent'       => round($outageSeconds / $duration * 100, 4),
+            'availability'         => round((1 - $outageSeconds / $duration) * 100, 4),
+            'longest_outage'       => empty($outages) ? 0 : max(array_column($outages, 'duration'))
         ];
     }
 
@@ -520,7 +534,7 @@ class OutageReport extends ReportHook
         foreach ($object['segments'] as $segment) {
             $x = 2 + (($segment['start'] - $start) / $duration * 756);
             $width = max(1, ($segment['duration'] / $duration * 756));
-            $class = $this->getStateClass($object['type'], $segment['state']);
+            $class = $this->getStateClass($object, $segment['state']);
             $title = sprintf(
                 '%s - %s, %s',
                 $this->formatTime($segment['start']),
@@ -569,22 +583,22 @@ class OutageReport extends ReportHook
         );
     }
 
-    private function getStateClass(string $type, int $state): string
+    private function getStateClass(array $object, int $state): string
     {
-        if ($this->isOutageState($type, $state)) {
+        if ($this->isOutageState($object['type'], $state, $object)) {
             return 'outage';
         }
 
-        if ($type === self::TYPE_SERVICE && $state === 1) {
+        if ($object['type'] === self::TYPE_SERVICE && $state === 1) {
             return 'warning';
         }
 
         return 'ok';
     }
 
-    private function isOutageState(string $type, int $state): bool
+    private function isOutageState(string $type, int $state, array $config): bool
     {
-        return $type === self::TYPE_HOST ? $state > 0 : $state > 1;
+        return $type === self::TYPE_HOST ? $state > 0 : $state >= $this->getServiceOutageState($config);
     }
 
     private function formatState(string $type, int $state): string
@@ -649,6 +663,11 @@ class OutageReport extends ReportHook
         return date('Y-m-d H:i:s', $timestamp);
     }
 
+    private function historyTimeToTimestamp(int $eventTime): int
+    {
+        return (int) floor($eventTime / 1000);
+    }
+
     private function formatNumber(float $number, int $precision): string
     {
         $formatted = rtrim(rtrim(number_format($number, $precision, '.', ''), '0'), '.');
@@ -671,6 +690,11 @@ class OutageReport extends ReportHook
     private function getMaxDetails(array $config): int
     {
         return max(1, min(50, (int) ($config['outage_max_details'] ?? 10)));
+    }
+
+    private function getServiceOutageState(array $config): int
+    {
+        return ($config['outage_service_state'] ?? 'critical') === 'warning' ? 1 : 2;
     }
 
     private function hexExpression(string $column): string
