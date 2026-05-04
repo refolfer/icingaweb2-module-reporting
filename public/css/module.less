@@ -41,6 +41,177 @@
   line-height: 0.5em;
 }
 
+.sla-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  margin: 0 0 1em;
+
+  span {
+    background: @gray-lighter;
+    border-radius: .25em;
+    padding: .25em .5em;
+
+    &.ok {
+      background: @color-ok;
+      color: @text-color-on-icinga-blue;
+    }
+
+    &.nok {
+      background: @color-critical;
+      color: @text-color-on-icinga-blue;
+    }
+  }
+}
+
+.sla-chart {
+  margin-bottom: 1em;
+}
+
+.sla-chart-row {
+  align-items: center;
+  display: grid;
+  gap: .75em;
+  grid-template-columns: minmax(12em, 2fr) minmax(12em, 5fr) 5em;
+  margin-bottom: .5em;
+}
+
+.sla-chart-label,
+.sla-chart-column-label {
+  overflow-wrap: anywhere;
+}
+
+.sla-chart-track,
+.sla-chart-column-track {
+  background: @gray-lighter;
+  border-radius: .25em;
+  overflow: hidden;
+}
+
+.sla-chart-track {
+  height: 1.25em;
+}
+
+.sla-chart-bar,
+.sla-chart-column-bar {
+  min-width: .2em;
+
+  &.ok {
+    background: @color-ok;
+  }
+
+  &.nok {
+    background: @color-critical;
+  }
+}
+
+.sla-chart-bar {
+  height: 100%;
+}
+
+.sla-chart-value,
+.sla-chart-column-value {
+  border-radius: .25em;
+  color: @text-color-on-icinga-blue;
+  padding: .15em .35em;
+  text-align: center;
+  white-space: nowrap;
+
+  &.ok {
+    background: @color-ok;
+  }
+
+  &.nok {
+    background: @color-critical;
+  }
+}
+
+.sla-chart-columns {
+  align-items: end;
+  display: flex;
+  gap: .75em;
+  min-height: 16em;
+  overflow-x: auto;
+  padding-bottom: .5em;
+}
+
+.sla-chart-column {
+  align-items: center;
+  display: flex;
+  flex: 0 0 6em;
+  flex-direction: column;
+  gap: .35em;
+}
+
+.sla-chart-column-track {
+  align-items: end;
+  display: flex;
+  height: 12em;
+  width: 2.5em;
+}
+
+.sla-chart-column-bar {
+  width: 100%;
+}
+
+.sla-chart-column-label {
+  max-width: 8em;
+  text-align: center;
+}
+
+.sla-chart-gauge {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2em;
+}
+
+.sla-chart-gauge-ring {
+  --sla-angle: 0deg;
+  align-items: center;
+  border-radius: 50%;
+  display: flex;
+  height: 14em;
+  justify-content: center;
+  width: 14em;
+
+  &.ok {
+    background: conic-gradient(@color-ok var(--sla-angle), @gray-lighter 0);
+  }
+
+  &.nok {
+    background: conic-gradient(@color-critical var(--sla-angle), @gray-lighter 0);
+  }
+}
+
+.sla-chart-gauge-center {
+  align-items: center;
+  background: @body-bg-color;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  height: 9em;
+  justify-content: center;
+  text-align: center;
+  width: 9em;
+
+  strong {
+    font-size: 2em;
+  }
+}
+
+.sla-chart-gauge-details {
+  display: grid;
+  gap: .25em 1em;
+  grid-template-columns: auto auto;
+  margin: 0;
+
+  dd {
+    font-weight: bold;
+    margin: 0;
+  }
+}
+
 /* Stuff that's missing in ipl <= 0.8 START */
 
 .dropdown {

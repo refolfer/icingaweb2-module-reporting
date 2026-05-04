@@ -187,8 +187,13 @@ class Report
 
         foreach ($this->getReportlets() as $reportlet) {
             $implementation = $reportlet->getImplementation();
+            $config = $reportlet->getRuntimeConfig();
 
-            $html->add($implementation->getHtml($timerange, $reportlet->getRuntimeConfig()));
+            if ($implementation instanceof SlaReport && SlaChart::shouldRenderChart($config)) {
+                $html->add(SlaChart::render($implementation, $timerange, $config));
+            } else {
+                $html->add($implementation->getHtml($timerange, $config));
+            }
         }
 
         return $html;

@@ -10,6 +10,7 @@ use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model\Report;
 use Icinga\Module\Reporting\ProvidedReports;
 use Icinga\Module\Reporting\RetryConnection;
+use Icinga\Module\Reporting\SlaChart;
 use ipl\Html\Form;
 use ipl\Html\HtmlDocument;
 use ipl\Sql\Expression;
@@ -187,6 +188,9 @@ class ReportForm extends CompatForm
             $reportlet = new $values['reportlet']();
 
             $reportlet->initConfigForm($config);
+            if (SlaChart::supports($values['reportlet'])) {
+                SlaChart::addConfigFormElement($config);
+            }
 
             foreach ($config->getElements() as $element) {
                 $this->addElement($element);
