@@ -209,7 +209,9 @@ class OutageReport extends ReportHook
     private function fetchHostHistoryCandidates(int $historyStart, int $historyEnd, array $config, int $limit): array
     {
         $filter = $this->getFilter($config);
-        $where = "sh.object_type = 'host' AND sh.event_time > ? AND sh.event_time < ?";
+        $where = "sh.object_type = 'host'"
+            . ' AND sh.event_time > ? AND sh.event_time < ?'
+            . ' AND (sh.hard_state > 0 OR sh.previous_hard_state > 0)';
         $params = [$historyStart, $historyEnd];
 
         if ($filter !== '') {
@@ -221,7 +223,7 @@ class OutageReport extends ReportHook
         $sql = sprintf(
             "SELECT 'host' AS object_type, %s AS host_id, NULL AS service_id, h.display_name AS label,"
             . ' NULL AS current_state,'
-            . " SUM(CASE WHEN sh.hard_state > 0 THEN 1 ELSE 0 END) AS problem_events"
+            . ' COUNT(*) AS problem_events'
             . ' FROM state_history sh INNER JOIN host h ON h.id = sh.host_id'
             . " WHERE $where GROUP BY h.id, h.display_name ORDER BY problem_events DESC, h.display_name LIMIT ?",
             $this->hexExpression('h.id')
@@ -263,7 +265,9 @@ class OutageReport extends ReportHook
     {
         $filter = $this->getFilter($config);
         $serviceOutageState = $this->getServiceOutageState($config);
-        $where = "sh.object_type = 'service' AND sh.event_time > ? AND sh.event_time < ?";
+        $where = "sh.object_type = 'service'"
+            . ' AND sh.event_time > ? AND sh.event_time < ?'
+            . " AND (sh.hard_state >= $serviceOutageState OR sh.previous_hard_state >= $serviceOutageState)";
         $params = [$historyStart, $historyEnd];
 
         if ($filter !== '') {
@@ -277,7 +281,7 @@ class OutageReport extends ReportHook
             "SELECT 'service' AS object_type, %s AS host_id, %s AS service_id,"
             . " CONCAT(h.display_name, ' / ', s.display_name) AS label,"
             . ' NULL AS current_state,'
-            . " SUM(CASE WHEN sh.hard_state >= $serviceOutageState THEN 1 ELSE 0 END) AS problem_events"
+            . ' COUNT(*) AS problem_events'
             . ' FROM state_history sh'
             . ' INNER JOIN host h ON h.id = sh.host_id'
             . ' INNER JOIN service s ON s.id = sh.service_id'
@@ -351,30 +355,38 @@ class OutageReport extends ReportHook
     private function fetchEvents(array $candidate, int $historyStart, int $historyEnd): array
     {
         $objectType = $candidate['object_type'];
-        $hostCondition = sprintf('sh.host_id = %s', $this->binaryExpression());
-        $params = [$objectType, $candidate['host_id']];
-        $sameObject = 'prev.object_type = sh.object_type AND prev.host_id = sh.host_id';
+        $currentObjectCondition = sprintf('sh.object_type = ? AND sh.host_id = %s', $this->binaryExpression());
+        $previousObjectCondition = sprintf('prev.object_type = ? AND prev.host_id = %s', $this->binaryExpression());
+        $currentParams = [$objectType, $candidate['host_id']];
+        $previousParams = [$objectType, $candidate['host_id']];
 
         if ($objectType === self::TYPE_SERVICE) {
-            $serviceCondition = sprintf('sh.service_id = %s', $this->binaryExpression());
-            $params[] = $candidate['service_id'];
-            $sameObject .= ' AND prev.service_id = sh.service_id';
+            $currentObjectCondition .= sprintf(' AND sh.service_id = %s', $this->binaryExpression());
+            $previousObjectCondition .= sprintf(' AND prev.service_id = %s', $this->binaryExpression());
+            $currentParams[] = $candidate['service_id'];
+            $previousParams[] = $candidate['service_id'];
         } else {
-            $serviceCondition = 'sh.service_id IS NULL';
-            $sameObject .= ' AND prev.service_id IS NULL';
+            $currentObjectCondition .= ' AND sh.service_id IS NULL';
+            $previousObjectCondition .= ' AND prev.service_id IS NULL';
         }
-
-        $params[] = $historyEnd;
-        $params[] = $historyStart;
-        $params[] = $historyStart;
 
         $sql = "SELECT sh.event_time, sh.hard_state, sh.previous_hard_state, sh.output, sh.long_output"
             . ' FROM state_history sh'
-            . " WHERE sh.object_type = ? AND $hostCondition AND $serviceCondition AND sh.event_time <= ?"
-            . ' AND (sh.event_time > ? OR sh.event_time = ('
+            . " WHERE $currentObjectCondition AND sh.event_time > ? AND sh.event_time <= ?"
+            . ' UNION ALL'
+            . ' SELECT sh.event_time, sh.hard_state, sh.previous_hard_state, sh.output, sh.long_output'
+            . ' FROM state_history sh'
+            . " WHERE $currentObjectCondition AND sh.event_time = ("
             . ' SELECT MAX(prev.event_time) FROM state_history prev'
-            . " WHERE $sameObject AND prev.event_time <= ?"
-            . ' )) ORDER BY sh.event_time ASC';
+            . " WHERE $previousObjectCondition AND prev.event_time <= ?"
+            . ' ) ORDER BY event_time ASC';
+        $params = array_merge(
+            $currentParams,
+            [$historyStart, $historyEnd],
+            $currentParams,
+            $previousParams,
+            [$historyStart]
+        );
 
         return IcingadbDatabase::get()->prepexec($sql, $params)->fetchAll(PDO::FETCH_OBJ);
     }
