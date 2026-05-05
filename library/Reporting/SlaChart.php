@@ -238,9 +238,7 @@ final class SlaChart
                     Html::tag('dt', null, t('Available')),
                     Html::tag('dd', ['class' => 'ok'], self::formatSla($average, $precision)),
                     Html::tag('dt', null, t('Unavailable')),
-                    Html::tag('dd', ['class' => 'nok'], self::formatSla(100 - $average, $precision)),
-                    Html::tag('dt', null, t('Threshold')),
-                    Html::tag('dd', null, self::formatSla($threshold, $precision))
+                    Html::tag('dd', ['class' => 'nok'], self::formatSla(100 - $average, $precision))
                 ])
             ]));
     }
@@ -276,8 +274,7 @@ final class SlaChart
 
         return Html::tag('div', ['class' => 'sla-chart-summary'], [
             Html::tag('span', null, sprintf(t('%d Rows'), $data->count())),
-            Html::tag('span', ['class' => $slaClass], sprintf(t('Average: %s'), self::formatSla($average, $precision))),
-            Html::tag('span', null, sprintf(t('Threshold: %s'), self::formatSla($threshold, $precision)))
+            Html::tag('span', ['class' => $slaClass], sprintf(t('Average: %s'), self::formatSla($average, $precision)))
         ]);
     }
 
