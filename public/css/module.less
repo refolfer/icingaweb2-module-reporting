@@ -74,6 +74,31 @@
   margin-bottom: 1em;
 }
 
+.sla-chart-host-separator {
+  border-top: 1px solid @gray-light;
+  color: @text-color;
+  font-weight: bold;
+  margin: .75em 0 .25em;
+  padding-top: .4em;
+  width: 100%;
+
+  span {
+    background: @body-bg-color;
+    padding-right: .5em;
+  }
+}
+
+.sla-chart-columns,
+.sla-chart-balance-columns {
+  .sla-chart-host-separator {
+    flex: 1 0 100%;
+  }
+}
+
+.sla-chart-gauge-grid .sla-chart-host-separator {
+  grid-column: 1 / -1;
+}
+
 .sla-chart-row {
   align-items: center;
   display: grid;
@@ -135,6 +160,7 @@
 .sla-chart-columns {
   align-items: end;
   display: flex;
+  flex-wrap: wrap;
   gap: .75em;
   min-height: 16em;
   overflow-x: auto;
@@ -168,6 +194,7 @@
 .sla-chart-balance-columns {
   align-items: start;
   display: flex;
+  flex-wrap: wrap;
   gap: .75em;
   overflow-x: auto;
   padding-bottom: .5em;

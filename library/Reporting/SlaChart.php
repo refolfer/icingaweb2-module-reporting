@@ -6,6 +6,7 @@
 namespace Icinga\Module\Reporting;
 
 use Icinga\Module\Icingadb\ProvidedHook\Reporting\HostSlaReport;
+use Icinga\Module\Icingadb\ProvidedHook\Reporting\ServiceSlaReport;
 use Icinga\Module\Icingadb\ProvidedHook\Reporting\SlaReport;
 use ipl\Html\Form;
 use ipl\Html\Html;
@@ -63,6 +64,7 @@ final class SlaChart
     public static function render(SlaReport $report, Timerange $timerange, array $config): ValidHtml
     {
         $data = $report->getData($timerange, $config);
+        $groupByHost = $report instanceof ServiceSlaReport;
 
         if (! count($data)) {
             return Html::tag('p', ['class' => 'empty-state'], t('No data found.'));
@@ -70,14 +72,14 @@ final class SlaChart
 
         switch (self::getType($config)) {
             case self::COLUMNS:
-                return self::renderColumns($data, $config);
+                return self::renderColumns($data, $config, $groupByHost);
             case self::BALANCE_COLUMNS:
-                return self::renderBalanceColumns($data, $config);
+                return self::renderBalanceColumns($data, $config, $groupByHost);
             case self::GAUGE:
-                return self::renderGauge($data, $config, $report instanceof HostSlaReport);
+                return self::renderGauge($data, $config, $report instanceof HostSlaReport, $groupByHost);
             case self::BARS:
             default:
-                return self::renderBars($data, $config);
+                return self::renderBars($data, $config, $groupByHost);
         }
     }
 
@@ -102,18 +104,24 @@ final class SlaChart
             : SlaReport::DEFAULT_REPORT_PRECISION;
     }
 
-    private static function renderBars(ReportData $data, array $config): HtmlDocument
+    private static function renderBars(ReportData $data, array $config, bool $groupByHost): HtmlDocument
     {
         $threshold = self::getThreshold($config);
         $precision = self::getPrecision($config);
+        $currentHost = null;
         $rows = [];
 
         foreach ($data->getRows() as $row) {
+            $dimensions = $row->getDimensions();
             $sla = self::normalizeSla((float) $row->getValues()[0]);
             $slaClass = self::getSlaClass($sla, $threshold);
 
+            if ($groupByHost) {
+                self::addHostSeparator($rows, $dimensions, $currentHost);
+            }
+
             $rows[] = Html::tag('div', ['class' => 'sla-chart-row'], [
-                Html::tag('div', ['class' => 'sla-chart-label'], self::formatDimensions($row->getDimensions())),
+                Html::tag('div', ['class' => 'sla-chart-label'], self::formatDisplayDimensions($dimensions, $groupByHost)),
                 Html::tag(
                     'div',
                     ['class' => 'sla-chart-track'],
@@ -131,15 +139,21 @@ final class SlaChart
             ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-bars'], $rows));
     }
 
-    private static function renderColumns(ReportData $data, array $config): HtmlDocument
+    private static function renderColumns(ReportData $data, array $config, bool $groupByHost): HtmlDocument
     {
         $threshold = self::getThreshold($config);
         $precision = self::getPrecision($config);
+        $currentHost = null;
         $columns = [];
 
         foreach ($data->getRows() as $row) {
+            $dimensions = $row->getDimensions();
             $sla = self::normalizeSla((float) $row->getValues()[0]);
             $slaClass = self::getSlaClass($sla, $threshold);
+
+            if ($groupByHost) {
+                self::addHostSeparator($columns, $dimensions, $currentHost);
+            }
 
             $columns[] = Html::tag('div', ['class' => 'sla-chart-column'], [
                 Html::tag(
@@ -151,7 +165,7 @@ final class SlaChart
                     ])
                 ),
                 Html::tag('div', ['class' => "sla-chart-column-value $slaClass"], self::formatSla($sla, $precision)),
-                Html::tag('div', ['class' => 'sla-chart-column-label'], self::formatDimensions($row->getDimensions()))
+                Html::tag('div', ['class' => 'sla-chart-column-label'], self::formatDisplayDimensions($dimensions, $groupByHost))
             ]);
         }
 
@@ -160,14 +174,20 @@ final class SlaChart
             ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-columns'], $columns));
     }
 
-    private static function renderBalanceColumns(ReportData $data, array $config): HtmlDocument
+    private static function renderBalanceColumns(ReportData $data, array $config, bool $groupByHost): HtmlDocument
     {
         $precision = self::getPrecision($config);
+        $currentHost = null;
         $columns = [];
 
         foreach ($data->getRows() as $row) {
+            $dimensions = $row->getDimensions();
             $sla = self::normalizeSla((float) $row->getValues()[0]);
             $unavailable = 100 - $sla;
+
+            if ($groupByHost) {
+                self::addHostSeparator($columns, $dimensions, $currentHost);
+            }
 
             $columns[] = Html::tag('div', ['class' => 'sla-chart-balance-column'], [
                 Html::tag('div', ['class' => 'sla-chart-balance-value ok'], self::formatSla($sla, $precision)),
@@ -187,7 +207,7 @@ final class SlaChart
                     ])
                 ]),
                 Html::tag('div', ['class' => 'sla-chart-balance-value nok'], self::formatSla($unavailable, $precision)),
-                Html::tag('div', ['class' => 'sla-chart-column-label'], self::formatDimensions($row->getDimensions()))
+                Html::tag('div', ['class' => 'sla-chart-column-label'], self::formatDisplayDimensions($dimensions, $groupByHost))
             ]);
         }
 
@@ -196,18 +216,28 @@ final class SlaChart
             ->addHtml(Html::tag('div', ['class' => 'sla-chart sla-chart-balance-columns'], $columns));
     }
 
-    private static function renderGauge(ReportData $data, array $config, bool $isHostReport): HtmlDocument
-    {
+    private static function renderGauge(
+        ReportData $data,
+        array $config,
+        bool $isHostReport,
+        bool $groupByHost
+    ): HtmlDocument {
         $threshold = self::getThreshold($config);
         $precision = self::getPrecision($config);
         $average = self::normalizeSla((float) $data->getAverages()[0]);
         $total = $isHostReport
             ? sprintf(t('%d Hosts'), $data->count())
             : sprintf(t('%d Services'), $data->count());
+        $currentHost = null;
         $charts = [];
 
         foreach ($data->getRows() as $row) {
+            $dimensions = $row->getDimensions();
             $sla = self::normalizeSla((float) $row->getValues()[0]);
+
+            if ($groupByHost) {
+                self::addHostSeparator($charts, $dimensions, $currentHost);
+            }
 
             $charts[] = Html::tag('div', ['class' => 'sla-chart-gauge-item'], [
                 self::renderGaugeRing(
@@ -216,7 +246,7 @@ final class SlaChart
                     self::getSlaClass($sla, $threshold),
                     'sla-chart-gauge-ring-small'
                 ),
-                Html::tag('div', ['class' => 'sla-chart-gauge-label'], self::formatDimensions($row->getDimensions())),
+                Html::tag('div', ['class' => 'sla-chart-gauge-label'], self::formatDisplayDimensions($dimensions, $groupByHost)),
                 Html::tag('div', ['class' => 'sla-chart-gauge-split'], [
                     Html::tag('span', ['class' => 'ok'], self::formatSla($sla, $precision)),
                     Html::tag('span', ['class' => 'nok'], self::formatSla(100 - $sla, $precision))
@@ -284,6 +314,41 @@ final class SlaChart
     private static function formatDimensions(array $dimensions): string
     {
         return implode(' / ', array_map('strval', $dimensions));
+    }
+
+    /**
+     * @param array<int, mixed> $dimensions
+     */
+    private static function formatDisplayDimensions(array $dimensions, bool $groupByHost): string
+    {
+        if ($groupByHost && count($dimensions) > 1) {
+            return self::formatDimensions(array_slice($dimensions, 1));
+        }
+
+        return self::formatDimensions($dimensions);
+    }
+
+    /**
+     * @param array<int, ValidHtml> $items
+     * @param array<int, mixed>     $dimensions
+     */
+    private static function addHostSeparator(array &$items, array $dimensions, ?string &$currentHost): void
+    {
+        if (! isset($dimensions[0])) {
+            return;
+        }
+
+        $host = (string) $dimensions[0];
+        if ($host === $currentHost) {
+            return;
+        }
+
+        $currentHost = $host;
+        $items[] = Html::tag(
+            'div',
+            ['class' => 'sla-chart-host-separator'],
+            Html::tag('span', null, $host)
+        );
     }
 
     private static function formatSla(float $sla, int $precision): string

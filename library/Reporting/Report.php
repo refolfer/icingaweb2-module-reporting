@@ -180,7 +180,7 @@ class Report
     /**
      * @return  HtmlDocument
      */
-    public function toHtml(bool $forPdf = false)
+    public function toHtml()
     {
         $timerange = $this->getTimeframe()->getTimerange();
 
@@ -192,9 +192,7 @@ class Report
             $config = $reportlet->getRuntimeConfig();
 
             if ($implementation instanceof SlaReport && SlaChart::shouldRenderChart($config)) {
-                $html->add($forPdf
-                    ? $implementation->getHtml($timerange, $config)
-                    : SlaChart::render($implementation, $timerange, $config));
+                $html->add(SlaChart::render($implementation, $timerange, $config));
             } else {
                 $html->add($implementation->getHtml($timerange, $config));
             }
@@ -326,7 +324,7 @@ class Report
         $html = (new PrintableHtmlDocument())
             ->setTitle($this->getName())
             ->addAttributes(['class' => 'icinga-module module-reporting'])
-            ->addHtml($this->toHtml(true));
+            ->addHtml($this->toHtml());
 
         if ($this->template !== null) {
             $this->template->setMacros([
