@@ -49,8 +49,8 @@ class OutageReport extends ReportHook
         ]);
 
         $form->addElement('text', 'outage_filter', [
-            'label'       => t('Name Filter'),
-            'description' => t('Optional case-insensitive text filter for host or service names')
+            'label'       => t('Object Filter'),
+            'description' => t('Optional Icinga DB filter, e.g. hostgroup.name=linux-servers')
         ]);
 
         $form->addElement('select', 'outage_service_state', [
@@ -208,16 +208,12 @@ class OutageReport extends ReportHook
      */
     private function fetchHostHistoryCandidates(int $historyStart, int $historyEnd, array $config, int $limit): array
     {
-        $filter = $this->getFilter($config);
         $where = "sh.object_type = 'host'"
             . ' AND sh.event_time > ? AND sh.event_time < ?'
             . ' AND (sh.hard_state > 0 OR sh.previous_hard_state > 0)';
         $params = [$historyStart, $historyEnd];
 
-        if ($filter !== '') {
-            $where .= ' AND LOWER(h.display_name) LIKE ?';
-            $params[] = $filter;
-        }
+        $where .= $this->getFilterSql($config, self::TYPE_HOST, $params);
 
         $params[] = $limit;
         $sql = sprintf(
@@ -237,14 +233,10 @@ class OutageReport extends ReportHook
      */
     private function fetchCurrentHostCandidates(array $config, int $limit): array
     {
-        $filter = $this->getFilter($config);
         $where = 'hs.hard_state > 0';
         $params = [];
 
-        if ($filter !== '') {
-            $where .= ' AND LOWER(h.display_name) LIKE ?';
-            $params[] = $filter;
-        }
+        $where .= $this->getFilterSql($config, self::TYPE_HOST, $params);
 
         $params[] = $limit;
         $sql = sprintf(
@@ -263,18 +255,13 @@ class OutageReport extends ReportHook
      */
     private function fetchServiceHistoryCandidates(int $historyStart, int $historyEnd, array $config, int $limit): array
     {
-        $filter = $this->getFilter($config);
         $serviceOutageState = $this->getServiceOutageState($config);
         $where = "sh.object_type = 'service'"
             . ' AND sh.event_time > ? AND sh.event_time < ?'
             . " AND (sh.hard_state >= $serviceOutageState OR sh.previous_hard_state >= $serviceOutageState)";
         $params = [$historyStart, $historyEnd];
 
-        if ($filter !== '') {
-            $where .= ' AND LOWER(CONCAT(h.display_name, ?, s.display_name)) LIKE ?';
-            $params[] = ' / ';
-            $params[] = $filter;
-        }
+        $where .= $this->getFilterSql($config, self::TYPE_SERVICE, $params);
 
         $params[] = $limit;
         $sql = sprintf(
@@ -299,15 +286,10 @@ class OutageReport extends ReportHook
      */
     private function fetchCurrentServiceCandidates(array $config, int $limit): array
     {
-        $filter = $this->getFilter($config);
         $where = sprintf('ss.hard_state >= %d', $this->getServiceOutageState($config));
         $params = [];
 
-        if ($filter !== '') {
-            $where .= ' AND LOWER(CONCAT(h.display_name, ?, s.display_name)) LIKE ?';
-            $params[] = ' / ';
-            $params[] = $filter;
-        }
+        $where .= $this->getFilterSql($config, self::TYPE_SERVICE, $params);
 
         $params[] = $limit;
         $sql = sprintf(
@@ -687,11 +669,166 @@ class OutageReport extends ReportHook
         return $formatted === '' ? '0' : $formatted;
     }
 
-    private function getFilter(array $config): string
+    /**
+     * @param array<int, mixed> $params
+     */
+    private function getFilterSql(array $config, string $objectType, array &$params): string
     {
-        $filter = strtolower(trim((string) ($config['outage_filter'] ?? '')));
+        $filter = trim((string) ($config['outage_filter'] ?? ''));
+        if ($filter === '') {
+            return '';
+        }
 
-        return $filter === '' ? '' : '%' . $filter . '%';
+        $condition = $this->parseObjectFilter($filter, $objectType);
+        if ($condition === null) {
+            $params[] = '%' . strtolower($filter) . '%';
+
+            return $objectType === self::TYPE_HOST
+                ? ' AND LOWER(h.display_name) LIKE ?'
+                : " AND LOWER(CONCAT(h.display_name, ' / ', s.display_name)) LIKE ?";
+        }
+
+        foreach ($condition['params'] as $param) {
+            $params[] = $param;
+        }
+
+        return ' AND ' . $condition['sql'];
+    }
+
+    /**
+     * @return ?array{sql: string, params: array<int, string>}
+     */
+    private function parseObjectFilter(string $filter, string $objectType): ?array
+    {
+        if (strpos($filter, '=') === false) {
+            return null;
+        }
+
+        $parts = preg_split('/\s*&\s*/', trim($filter)) ?: [];
+        $conditions = [];
+        $params = [];
+
+        foreach ($parts as $part) {
+            $condition = $this->parseObjectFilterCondition($part, $objectType);
+            if ($condition === null) {
+                return null;
+            }
+
+            $conditions[] = $condition['sql'];
+            foreach ($condition['params'] as $param) {
+                $params[] = $param;
+            }
+        }
+
+        return [
+            'sql'    => '(' . implode(' AND ', $conditions) . ')',
+            'params' => $params
+        ];
+    }
+
+    /**
+     * @return ?array{sql: string, params: array<int, string>}
+     */
+    private function parseObjectFilterCondition(string $filter, string $objectType): ?array
+    {
+        if (! preg_match('/^\s*([a-z][a-z0-9_.]*)\s*(!=|=)\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s]+))\s*$/i', $filter, $match)) {
+            return null;
+        }
+
+        $field = strtolower($match[1]);
+        $operator = $match[2];
+        $doubleQuotedValue = $match[3] ?? '';
+        $singleQuotedValue = $match[4] ?? '';
+        $unquotedValue = $match[5] ?? '';
+        $value = $doubleQuotedValue !== ''
+            ? $doubleQuotedValue
+            : ($singleQuotedValue !== '' ? $singleQuotedValue : $unquotedValue);
+        $comparison = $operator === '!=' ? '<>' : '=';
+        $negateExists = $operator === '!=' ? 'NOT ' : '';
+
+        switch ($field) {
+            case 'host.name':
+                return [
+                    'sql'    => "h.name $comparison ?",
+                    'params' => [$value]
+                ];
+
+            case 'host.display_name':
+                return [
+                    'sql'    => "h.display_name $comparison ?",
+                    'params' => [$value]
+                ];
+
+            case 'service.name':
+                if ($objectType !== self::TYPE_SERVICE) {
+                    return ['sql' => '1 = 0', 'params' => []];
+                }
+
+                return [
+                    'sql'    => "s.name $comparison ?",
+                    'params' => [$value]
+                ];
+
+            case 'service.display_name':
+                if ($objectType !== self::TYPE_SERVICE) {
+                    return ['sql' => '1 = 0', 'params' => []];
+                }
+
+                return [
+                    'sql'    => "s.display_name $comparison ?",
+                    'params' => [$value]
+                ];
+
+            case 'hostgroup.name':
+                return [
+                    'sql'    => $negateExists . 'EXISTS ('
+                        . 'SELECT 1 FROM hostgroup_member hgm'
+                        . ' INNER JOIN hostgroup hg ON hg.id = hgm.hostgroup_id'
+                        . " WHERE hgm.host_id = h.id AND hg.name = ?"
+                        . ')',
+                    'params' => [$value]
+                ];
+
+            case 'hostgroup.display_name':
+                return [
+                    'sql'    => $negateExists . 'EXISTS ('
+                        . 'SELECT 1 FROM hostgroup_member hgm'
+                        . ' INNER JOIN hostgroup hg ON hg.id = hgm.hostgroup_id'
+                        . " WHERE hgm.host_id = h.id AND hg.display_name = ?"
+                        . ')',
+                    'params' => [$value]
+                ];
+
+            case 'servicegroup.name':
+                if ($objectType !== self::TYPE_SERVICE) {
+                    return ['sql' => '1 = 0', 'params' => []];
+                }
+
+                return [
+                    'sql'    => $negateExists . 'EXISTS ('
+                        . 'SELECT 1 FROM servicegroup_member sgm'
+                        . ' INNER JOIN servicegroup sg ON sg.id = sgm.servicegroup_id'
+                        . " WHERE sgm.service_id = s.id AND sg.name = ?"
+                        . ')',
+                    'params' => [$value]
+                ];
+
+            case 'servicegroup.display_name':
+                if ($objectType !== self::TYPE_SERVICE) {
+                    return ['sql' => '1 = 0', 'params' => []];
+                }
+
+                return [
+                    'sql'    => $negateExists . 'EXISTS ('
+                        . 'SELECT 1 FROM servicegroup_member sgm'
+                        . ' INNER JOIN servicegroup sg ON sg.id = sgm.servicegroup_id'
+                        . " WHERE sgm.service_id = s.id AND sg.display_name = ?"
+                        . ')',
+                    'params' => [$value]
+                ];
+        }
+
+        return null;
     }
 
     private function getLimit(array $config): int

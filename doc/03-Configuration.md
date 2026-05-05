@@ -59,6 +59,9 @@ configuration if you want to override it. This setting is stored as
 `[icingadb] resource` in the reporting module configuration. The report lists
 host and service outage intervals, includes
 check output details and renders time series charts for each affected object.
+Its object filter supports simple text searches as well as exact Icinga DB
+object filters for `host.name`, `service.name`, `hostgroup.name` and
+`servicegroup.name`.
 
 This can be used to limit report data to a subset of monitored objects, for
 example:
