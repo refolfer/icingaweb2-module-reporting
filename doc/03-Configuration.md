@@ -54,8 +54,10 @@ pie charts. CSV and JSON exports continue to use tabular data.
 
 The module also provides an `Outage Report (Icinga DB)` report. It uses the
 Icinga DB database resource configured in the `icingadb` module, or the
-`[icingadb] resource` setting in the reporting module configuration if you want
-to override it. The report lists host and service outage intervals, includes
+`Icinga DB Resource Config` setting in the reporting module's backend
+configuration if you want to override it. This setting is stored as
+`[icingadb] resource` in the reporting module configuration. The report lists
+host and service outage intervals, includes
 check output details and renders time series charts for each affected object.
 
 This can be used to limit report data to a subset of monitored objects, for

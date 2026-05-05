@@ -53,7 +53,7 @@ final class IcingadbDatabase
     {
         $reportingConfig = Config::module('reporting');
         $resource = $reportingConfig->get('icingadb', 'resource');
-        if ($resource !== null) {
+        if ($resource !== null && $resource !== '') {
             return $resource;
         }
 
