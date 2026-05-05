@@ -12,6 +12,7 @@ use Icinga\Module\Icingadb\ProvidedHook\Reporting\SlaReport;
 use Icinga\Module\Pdfexport\PrintableHtmlDocument;
 use Icinga\Module\Reporting\Web\Widget\Template;
 use Icinga\Util\Json;
+use ipl\Html\Html;
 use ipl\Html\HtmlDocument;
 
 use function ipl\I18n\t;
@@ -179,18 +180,21 @@ class Report
     /**
      * @return  HtmlDocument
      */
-    public function toHtml()
+    public function toHtml(bool $forPdf = false)
     {
         $timerange = $this->getTimeframe()->getTimerange();
 
         $html = new HtmlDocument();
+        $html->addHtml($this->renderTitle());
 
         foreach ($this->getReportlets() as $reportlet) {
             $implementation = $reportlet->getImplementation();
             $config = $reportlet->getRuntimeConfig();
 
             if ($implementation instanceof SlaReport && SlaChart::shouldRenderChart($config)) {
-                $html->add(SlaChart::render($implementation, $timerange, $config));
+                $html->add($forPdf
+                    ? $implementation->getHtml($timerange, $config)
+                    : SlaChart::render($implementation, $timerange, $config));
             } else {
                 $html->add($implementation->getHtml($timerange, $config));
             }
@@ -322,7 +326,7 @@ class Report
         $html = (new PrintableHtmlDocument())
             ->setTitle($this->getName())
             ->addAttributes(['class' => 'icinga-module module-reporting'])
-            ->addHtml($this->toHtml());
+            ->addHtml($this->toHtml(true));
 
         if ($this->template !== null) {
             $this->template->setMacros([
@@ -342,5 +346,10 @@ class Report
         }
 
         return $html;
+    }
+
+    protected function renderTitle()
+    {
+        return Html::tag('h1', ['class' => 'report-title'], $this->getName());
     }
 }
