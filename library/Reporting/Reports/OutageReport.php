@@ -472,11 +472,13 @@ class OutageReport extends ReportHook
         $rows = [];
 
         foreach ($outages as $outage) {
+            $stateClass = $this->getStateClass($object, $outage['state']);
+
             $rows[] = Html::tag('tr', null, [
                 Html::tag('td', null, $this->formatTime($outage['start'])),
                 Html::tag('td', null, $this->formatTime($outage['end'])),
                 Html::tag('td', null, $this->formatDuration($outage['duration'])),
-                Html::tag('td', null, $this->formatState($object['type'], $outage['state'])),
+                Html::tag('td', ['class' => $stateClass], $this->formatState($object['type'], $outage['state'])),
                 Html::tag('td', null, $outage['output'])
             ]);
         }
@@ -579,12 +581,12 @@ class OutageReport extends ReportHook
 
     private function getStateClass(array $object, int $state): string
     {
-        if ($this->isOutageState($object['type'], $state, $object)) {
-            return 'outage';
-        }
-
         if ($object['type'] === self::TYPE_SERVICE && $state === 1) {
             return 'warning';
+        }
+
+        if ($this->isOutageState($object['type'], $state, $object)) {
+            return 'outage';
         }
 
         return 'ok';

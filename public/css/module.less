@@ -370,6 +370,14 @@
   }
 }
 
+.sla-chart-column,
+.sla-chart-balance-column,
+.sla-chart-gauge-item,
+.sla-chart-gauge-summary {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .outage-report-overview {
   display: flex;
   flex-wrap: wrap;
@@ -462,7 +470,7 @@
   }
 
   .warning {
-    fill: fade(#f6c342, 75%);
+    fill: fade(#ff8c00, 75%);
   }
 
   .outage {
@@ -483,6 +491,16 @@
   th {
     overflow-wrap: anywhere;
     vertical-align: top;
+  }
+
+  .warning {
+    color: #ff8c00;
+    font-weight: bold;
+  }
+
+  .outage {
+    color: @color-critical;
+    font-weight: bold;
   }
 }
 
@@ -629,6 +647,43 @@
 
 @media print {
   font-family: @font-family-print;
+
+  .sla-chart-columns,
+  .sla-chart-balance-columns,
+  .sla-chart-gauge-grid {
+    display: block;
+    overflow: visible;
+  }
+
+  .sla-chart-columns,
+  .sla-chart-balance-columns {
+    min-height: 0;
+  }
+
+  .sla-chart-column,
+  .sla-chart-balance-column,
+  .sla-chart-gauge-item {
+    display: inline-flex;
+    margin: 0 .75em .75em 0;
+  }
+
+  .sla-chart-column {
+    vertical-align: bottom;
+  }
+
+  .sla-chart-balance-column,
+  .sla-chart-gauge-item {
+    vertical-align: top;
+  }
+
+  .sla-chart-gauge-item {
+    width: 9em;
+  }
+
+  .sla-chart-host-separator {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
 }
 
 .preview .page {
