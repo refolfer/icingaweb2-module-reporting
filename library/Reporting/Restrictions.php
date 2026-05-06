@@ -196,6 +196,8 @@ final class Restrictions
 
     private static function supportsObjectFilter(?string $reportletClass): bool
     {
+        $reportletClass = $reportletClass === null ? null : ltrim($reportletClass, '\\');
+
         return $reportletClass !== null
             && (
                 strpos($reportletClass, 'Icinga\\Module\\Icingadb\\ProvidedHook\\Reporting\\') === 0
