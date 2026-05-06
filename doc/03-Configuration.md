@@ -48,7 +48,8 @@ user unless the user is unrestricted.
 
 `reporting/filter/objects` uses the same filter expression syntax as Icinga DB
 and is applied during interactive report rendering and export to reportlets that
-expose a `filter` setting, such as host and service SLA reports.
+expose a `filter` setting, such as host and service SLA reports, and to the
+`Outage Report (Icinga DB)` report.
 
 For SLA reports, the report form also provides an `SLA Visualization` option.
 It controls the HTML and PDF presentation of the report and can show SLA results

@@ -678,25 +678,40 @@ class OutageReport extends ReportHook
      */
     private function getFilterSql(array $config, string $objectType, array &$params): string
     {
-        $filter = trim((string) ($config['outage_filter'] ?? ''));
-        if ($filter === '') {
-            return '';
+        $sql = '';
+        $outageFilter = trim((string) ($config['outage_filter'] ?? ''));
+        if ($outageFilter !== '') {
+            $condition = $this->parseObjectFilter($outageFilter, $objectType);
+            if ($condition === null) {
+                $params[] = '%' . strtolower($outageFilter) . '%';
+
+                $sql .= $objectType === self::TYPE_HOST
+                    ? ' AND LOWER(h.display_name) LIKE ?'
+                    : " AND LOWER(CONCAT(h.display_name, ' / ', s.display_name)) LIKE ?";
+            } else {
+                foreach ($condition['params'] as $param) {
+                    $params[] = $param;
+                }
+
+                $sql .= ' AND ' . $condition['sql'];
+            }
         }
 
-        $condition = $this->parseObjectFilter($filter, $objectType);
-        if ($condition === null) {
-            $params[] = '%' . strtolower($filter) . '%';
+        $restrictionFilter = trim((string) ($config['filter'] ?? ''));
+        if ($restrictionFilter !== '') {
+            $condition = $this->parseObjectFilter($restrictionFilter, $objectType);
+            if ($condition === null) {
+                return $sql . ' AND 1 = 0';
+            }
 
-            return $objectType === self::TYPE_HOST
-                ? ' AND LOWER(h.display_name) LIKE ?'
-                : " AND LOWER(CONCAT(h.display_name, ' / ', s.display_name)) LIKE ?";
+            foreach ($condition['params'] as $param) {
+                $params[] = $param;
+            }
+
+            $sql .= ' AND ' . $condition['sql'];
         }
 
-        foreach ($condition['params'] as $param) {
-            $params[] = $param;
-        }
-
-        return ' AND ' . $condition['sql'];
+        return $sql;
     }
 
     /**
@@ -704,16 +719,53 @@ class OutageReport extends ReportHook
      */
     private function parseObjectFilter(string $filter, string $objectType): ?array
     {
+        $filter = trim($filter);
         if (strpos($filter, '=') === false) {
             return null;
         }
 
-        $parts = preg_split('/\s*&\s*/', trim($filter)) ?: [];
+        return $this->parseObjectFilterExpression($filter, $objectType);
+    }
+
+    /**
+     * @return ?array{sql: string, params: array<int, string>}
+     */
+    private function parseObjectFilterExpression(string $filter, string $objectType): ?array
+    {
+        $filter = trim($filter);
+        while ($this->isWrappedInParentheses($filter)) {
+            $filter = trim(substr($filter, 1, -1));
+        }
+
+        $orParts = $this->splitTopLevelFilterExpression($filter, '|');
+        if (count($orParts) > 1) {
+            return $this->parseObjectFilterParts($orParts, $objectType, 'OR');
+        }
+
+        $andParts = $this->splitTopLevelFilterExpression($filter, '&');
+        if (count($andParts) > 1) {
+            return $this->parseObjectFilterParts($andParts, $objectType, 'AND');
+        }
+
+        return $this->parseObjectFilterCondition($filter, $objectType);
+    }
+
+    /**
+     * @param string[] $parts
+     *
+     * @return ?array{sql: string, params: array<int, string>}
+     */
+    private function parseObjectFilterParts(array $parts, string $objectType, string $operator): ?array
+    {
         $conditions = [];
         $params = [];
 
         foreach ($parts as $part) {
-            $condition = $this->parseObjectFilterCondition($part, $objectType);
+            if (trim($part) === '') {
+                return null;
+            }
+
+            $condition = $this->parseObjectFilterExpression($part, $objectType);
             if ($condition === null) {
                 return null;
             }
@@ -725,9 +777,110 @@ class OutageReport extends ReportHook
         }
 
         return [
-            'sql'    => '(' . implode(' AND ', $conditions) . ')',
+            'sql'    => '(' . implode(" $operator ", $conditions) . ')',
             'params' => $params
         ];
+    }
+
+    /**
+     * @return string[]
+     */
+    private function splitTopLevelFilterExpression(string $filter, string $separator): array
+    {
+        $parts = [];
+        $offset = 0;
+        $depth = 0;
+        $quote = null;
+        $length = strlen($filter);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $filter[$i];
+
+            if ($quote !== null) {
+                if ($char === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($char === '"' || $char === "'") {
+                $quote = $char;
+                continue;
+            }
+
+            if ($char === '(') {
+                $depth++;
+                continue;
+            }
+
+            if ($char === ')') {
+                $depth--;
+                if ($depth < 0) {
+                    return [$filter];
+                }
+
+                continue;
+            }
+
+            if ($depth === 0 && $char === $separator) {
+                $parts[] = substr($filter, $offset, $i - $offset);
+                $offset = $i + 1;
+            }
+        }
+
+        if (empty($parts)) {
+            return [$filter];
+        }
+
+        $parts[] = substr($filter, $offset);
+
+        return $parts;
+    }
+
+    private function isWrappedInParentheses(string $filter): bool
+    {
+        $length = strlen($filter);
+        if ($length < 2 || $filter[0] !== '(' || $filter[$length - 1] !== ')') {
+            return false;
+        }
+
+        $depth = 0;
+        $quote = null;
+        for ($i = 0; $i < $length; $i++) {
+            $char = $filter[$i];
+
+            if ($quote !== null) {
+                if ($char === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($char === '"' || $char === "'") {
+                $quote = $char;
+                continue;
+            }
+
+            if ($char === '(') {
+                $depth++;
+                continue;
+            }
+
+            if ($char === ')') {
+                $depth--;
+                if ($depth === 0 && $i < $length - 1) {
+                    return false;
+                }
+
+                if ($depth < 0) {
+                    return false;
+                }
+            }
+        }
+
+        return $depth === 0;
     }
 
     /**

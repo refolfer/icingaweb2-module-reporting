@@ -23,8 +23,9 @@ final class Restrictions
      * Apply runtime object restrictions to a reportlet config.
      *
      * Reportlets that expose a `filter` option are restricted directly. In addition,
-     * Icinga DB reporting hooks are treated as filter-aware even if the persisted
-     * config does not yet contain a `filter` key.
+     * Icinga DB reporting hooks and object-filter-aware reporting module hooks are
+     * treated as filter-aware even if the persisted config does not yet contain a
+     * `filter` key.
      *
      * @param array<string, mixed> $config
      *
@@ -32,7 +33,8 @@ final class Restrictions
      */
     public static function applyToReportletConfig(array $config, ?string $reportletClass = null): array
     {
-        if (! array_key_exists('filter', $config) && ! self::supportsObjectFilter($reportletClass)) {
+        $filterKey = self::getObjectFilterConfigKey($config, $reportletClass);
+        if ($filterKey === null) {
             return $config;
         }
 
@@ -41,7 +43,7 @@ final class Restrictions
             return $config;
         }
 
-        $config['filter'] = self::mergeFilters($config['filter'] ?? null, $restrictionFilter);
+        $config[$filterKey] = self::mergeFilters($config[$filterKey] ?? null, $restrictionFilter);
 
         return $config;
     }
@@ -180,10 +182,25 @@ final class Restrictions
         return sprintf('(%s)', trim($filter));
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
+    private static function getObjectFilterConfigKey(array $config, ?string $reportletClass): ?string
+    {
+        if (array_key_exists('filter', $config) || self::supportsObjectFilter($reportletClass)) {
+            return 'filter';
+        }
+
+        return null;
+    }
+
     private static function supportsObjectFilter(?string $reportletClass): bool
     {
         return $reportletClass !== null
-            && strpos($reportletClass, 'Icinga\\Module\\Icingadb\\ProvidedHook\\Reporting\\') === 0;
+            && (
+                strpos($reportletClass, 'Icinga\\Module\\Icingadb\\ProvidedHook\\Reporting\\') === 0
+                || $reportletClass === 'Icinga\\Module\\Reporting\\Reports\\OutageReport'
+            );
     }
 
     private static function getUsername(): ?string
