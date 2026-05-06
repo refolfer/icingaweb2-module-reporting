@@ -74,6 +74,12 @@ example:
 hostgroup.name=linux-servers
 ```
 
+Values may contain spaces without quotes:
+
+```
+hostgroup.name=Linux Hosts
+```
+
 ## Icinga Reporting Daemon
 
 There is a daemon for generating and distributing reports on a schedule if configured:

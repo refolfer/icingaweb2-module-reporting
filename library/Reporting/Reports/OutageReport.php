@@ -888,7 +888,7 @@ class OutageReport extends ReportHook
      */
     private function parseObjectFilterCondition(string $filter, string $objectType): ?array
     {
-        if (! preg_match('/^\s*([a-z][a-z0-9_.]*)\s*(!=|=)\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s]+))\s*$/i', $filter, $match)) {
+        if (! preg_match('/^\s*([a-z][a-z0-9_.]*)\s*(!=|=)\s*(?:"([^"]*)"|\'([^\']*)\'|(.+))\s*$/i', $filter, $match)) {
             return null;
         }
 
@@ -896,7 +896,7 @@ class OutageReport extends ReportHook
         $operator = $match[2];
         $doubleQuotedValue = $match[3] ?? '';
         $singleQuotedValue = $match[4] ?? '';
-        $unquotedValue = $match[5] ?? '';
+        $unquotedValue = trim($match[5] ?? '');
         $value = $doubleQuotedValue !== ''
             ? $doubleQuotedValue
             : ($singleQuotedValue !== '' ? $singleQuotedValue : $unquotedValue);
