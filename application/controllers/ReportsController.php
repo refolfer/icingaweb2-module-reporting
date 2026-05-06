@@ -9,6 +9,7 @@ use Icinga\Module\Icingadb\ProvidedHook\Reporting\HostSlaReport;
 use Icinga\Module\Icingadb\ProvidedHook\Reporting\ServiceSlaReport;
 use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model\Report;
+use Icinga\Module\Reporting\Restrictions;
 use Icinga\Module\Reporting\Web\Controller;
 use Icinga\Module\Reporting\Web\Forms\ReportForm;
 use Icinga\Module\Reporting\Web\ReportsTimeframesAndTemplatesTabs;
@@ -23,22 +24,25 @@ class ReportsController extends Controller
 
     public function indexAction(): void
     {
+        $this->assertPermission('reporting/reports');
         $this->createTabs()->activate('reports');
 
-        if ($this->hasPermission('reporting/reports')) {
-            $this->addControl(
-                (new ButtonLink(
-                    $this->translate('New Report'),
-                    Url::fromPath('reporting/reports/new'),
-                    'plus'
-                ))->openInModal()
-            );
-        }
+        $this->addControl(
+            (new ButtonLink(
+                $this->translate('New Report'),
+                Url::fromPath('reporting/reports/new'),
+                'plus'
+            ))->openInModal()
+        );
 
         $tableRows = [];
 
         $reports = Report::on(Database::get())
             ->withColumns(['report.timeframe.name']);
+        $reportAccessFilter = Restrictions::getReportAccessFilter();
+        if ($reportAccessFilter !== null) {
+            $reports->filter($reportAccessFilter);
+        }
 
         $sortControl = $this->createSortControl(
             $reports,
@@ -92,7 +96,7 @@ class ReportsController extends Controller
 
             $this->addContent($table);
         } else {
-            $this->addContent(Html::tag('p', null, 'No reports created yet.'));
+            $this->addContent(Html::tag('p', null, 'No reports available.'));
         }
     }
 

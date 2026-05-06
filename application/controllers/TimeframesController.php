@@ -22,19 +22,16 @@ class TimeframesController extends Controller
 
     public function indexAction(): void
     {
+        $this->assertPermission('reporting/timeframes');
         $this->createTabs()->activate('timeframes');
 
-        $canManage = $this->hasPermission('reporting/timeframes');
-
-        if ($canManage) {
-            $this->addControl(
-                (new ButtonLink(
-                    $this->translate('New Timeframe'),
-                    Url::fromPath('reporting/timeframes/new'),
-                    'plus'
-                ))->openInModal()
-            );
-        }
+        $this->addControl(
+            (new ButtonLink(
+                $this->translate('New Timeframe'),
+                Url::fromPath('reporting/timeframes/new'),
+                'plus'
+            ))->openInModal()
+        );
 
         $tableRows = [];
 
@@ -52,14 +49,10 @@ class TimeframesController extends Controller
         $this->addControl($sortControl);
 
         foreach ($timeframes as $timeframe) {
-            $subject = $timeframe->name;
-
-            if ($canManage) {
-                $subject = new Link(
-                    $timeframe->name,
-                    Url::fromPath('reporting/timeframe/edit', ['id' => $timeframe->id])
-                );
-            }
+            $subject = new Link(
+                $timeframe->name,
+                Url::fromPath('reporting/timeframe/edit', ['id' => $timeframe->id])
+            );
 
             $tableRows[] = Html::tag('tr', null, [
                 Html::tag('td', null, $subject),

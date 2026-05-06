@@ -10,7 +10,21 @@ namespace Icinga\Module\Reporting {
     $this->provideCssFile('system-report.css');
 
     $this->menuSection(N_('Reporting'), ['icon' => 'fa-chart-simple', 'priority' => 100])
-        ->add(N_('Reports'), ['url' => 'reporting/reports', 'priority' => 10]);
+        ->add(N_('Reports'), [
+            'url'        => 'reporting/reports',
+            'priority'   => 10,
+            'permission' => 'reporting/reports'
+        ])
+        ->add(N_('Time Frames'), [
+            'url'        => 'reporting/timeframes',
+            'priority'   => 20,
+            'permission' => 'reporting/timeframes'
+        ])
+        ->add(N_('Templates'), [
+            'url'        => 'reporting/templates',
+            'priority'   => 30,
+            'permission' => 'reporting/templates'
+        ]);
 
     $this->provideConfigTab('backend', array(
         'title' => $this->translate('Configure the database backend'),

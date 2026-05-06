@@ -20,14 +20,14 @@ that is used as the sender's address (From) in E-mails.
 
 ## Permissions
 
-There are four permissions that can be used to control what can be managed by whom.
+There are four permissions that can be used to control what can be accessed and managed by whom.
 
-| Permission           | Applies to                        |
-|----------------------|-----------------------------------|
-| reporting/reports    | Reports (create, edit, delete)    |
-| reporting/schedules  | Schedules (create, edit, delete)  |
-| reporting/templates  | Templates (create, edit, delete)  |
-| reporting/timeframes | Timeframes (create, edit, delete) |
+| Permission           | Applies to                              |
+|----------------------|-----------------------------------------|
+| reporting/reports    | Reports (view, create, edit, delete)    |
+| reporting/schedules  | Schedules (create, edit, delete)        |
+| reporting/templates  | Templates (view, create, edit, delete)  |
+| reporting/timeframes | Timeframes (view, create, edit, delete) |
 
 ## Restrictions
 
@@ -42,6 +42,9 @@ The module provides the following restrictions:
 `reporting/users` and `reporting/groups` accept comma-separated or line-separated
 values. If neither restriction is configured, access to reporting is not limited
 by user or group. Use `*` in either restriction to allow every authenticated user.
+When either restriction is configured for the current role, report lists and
+direct report URLs are additionally limited to reports authored by the current
+user unless the user is unrestricted.
 
 `reporting/filter/objects` uses the same filter expression syntax as Icinga DB
 and is applied during interactive report rendering and export to reportlets that

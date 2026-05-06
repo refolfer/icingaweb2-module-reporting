@@ -11,6 +11,7 @@ use Icinga\Module\Pdfexport\ProvidedHook\Pdfexport;
 use Icinga\Module\Reporting\Database;
 use Icinga\Module\Reporting\Model;
 use Icinga\Module\Reporting\Report;
+use Icinga\Module\Reporting\Restrictions;
 use Icinga\Module\Reporting\Web\Controller;
 use Icinga\Module\Reporting\Web\Forms\ReportForm;
 use Icinga\Module\Reporting\Web\Forms\ScheduleForm;
@@ -34,12 +35,20 @@ class ReportController extends Controller
     {
         parent::init();
 
+        $this->assertPermission('reporting/reports');
+
         $reportId = $this->params->getRequired('id');
 
         /** @var Model\Report $report */
+        $filter = Filter::all(Filter::equal('id', $reportId));
+        $reportAccessFilter = Restrictions::getReportAccessFilter();
+        if ($reportAccessFilter !== null) {
+            $filter->add($reportAccessFilter);
+        }
+
         $report = Model\Report::on(Database::get())
             ->with(['timeframe'])
-            ->filter(Filter::equal('id', $reportId))
+            ->filter($filter)
             ->first();
 
         if ($report === null) {

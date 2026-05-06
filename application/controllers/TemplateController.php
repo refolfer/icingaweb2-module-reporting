@@ -29,6 +29,8 @@ class TemplateController extends Controller
     {
         parent::init();
 
+        $this->assertPermission('reporting/templates');
+
         /** @var Model\Template $template */
         $template = Model\Template::on(Database::get())
             ->filter(Filter::equal('id', $this->params->getRequired('id')))

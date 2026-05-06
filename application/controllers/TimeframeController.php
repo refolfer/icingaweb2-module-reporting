@@ -24,6 +24,8 @@ class TimeframeController extends Controller
     {
         parent::init();
 
+        $this->assertPermission('reporting/timeframes');
+
         /** @var Model\Timeframe $timeframe */
         $timeframe = Model\Timeframe::on(Database::get())
             ->filter(Filter::equal('id', $this->params->getRequired('id')))
@@ -38,7 +40,6 @@ class TimeframeController extends Controller
 
     public function editAction(): void
     {
-        $this->assertPermission('reporting/timeframes');
         $this->addTitleTab($this->translate('Edit Time Frame'));
 
         $values = [

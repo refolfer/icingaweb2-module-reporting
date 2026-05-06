@@ -22,19 +22,16 @@ class TemplatesController extends Controller
 
     public function indexAction(): void
     {
+        $this->assertPermission('reporting/templates');
         $this->createTabs()->activate('templates');
 
-        $canManage = $this->hasPermission('reporting/templates');
-
-        if ($canManage) {
-            $this->addControl(
-                (new ButtonLink(
-                    $this->translate('New Template'),
-                    Url::fromPath('reporting/templates/new'),
-                    'plus'
-                ))->openInModal()
-            );
-        }
+        $this->addControl(
+            (new ButtonLink(
+                $this->translate('New Template'),
+                Url::fromPath('reporting/templates/new'),
+                'plus'
+            ))->openInModal()
+        );
 
         $templates = Model\Template::on(Database::get());
 

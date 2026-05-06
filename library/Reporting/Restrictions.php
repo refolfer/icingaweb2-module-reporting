@@ -7,6 +7,7 @@ namespace Icinga\Module\Reporting;
 
 use Exception;
 use Icinga\Authentication\Auth;
+use ipl\Stdlib\Filter;
 
 final class Restrictions
 {
@@ -76,6 +77,38 @@ final class Restrictions
         }
 
         return false;
+    }
+
+    public static function getReportAccessFilter()
+    {
+        if (self::canAccessAllReports()) {
+            return null;
+        }
+
+        $username = self::getUsername();
+        if ($username === null) {
+            return Filter::equal('author', '');
+        }
+
+        return Filter::equal('author', $username);
+    }
+
+    public static function canAccessAllReports(): bool
+    {
+        try {
+            $user = Auth::getInstance()->getUser();
+        } catch (Exception $_) {
+            return true;
+        }
+
+        if ($user === null || $user->isUnrestricted()) {
+            return true;
+        }
+
+        $users = self::normalizeAccessRestrictions($user->getRestrictions(self::USERS));
+        $groups = self::normalizeAccessRestrictions($user->getRestrictions(self::GROUPS));
+
+        return empty($users) && empty($groups);
     }
 
     /**
@@ -151,6 +184,21 @@ final class Restrictions
     {
         return $reportletClass !== null
             && strpos($reportletClass, 'Icinga\\Module\\Icingadb\\ProvidedHook\\Reporting\\') === 0;
+    }
+
+    private static function getUsername(): ?string
+    {
+        try {
+            $user = Auth::getInstance()->getUser();
+        } catch (Exception $_) {
+            return null;
+        }
+
+        if ($user === null) {
+            return null;
+        }
+
+        return $user->getUsername();
     }
 
     /**
