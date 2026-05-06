@@ -900,60 +900,52 @@ class OutageReport extends ReportHook
         $value = $doubleQuotedValue !== ''
             ? $doubleQuotedValue
             : ($singleQuotedValue !== '' ? $singleQuotedValue : $unquotedValue);
-        $comparison = $operator === '!=' ? '<>' : '=';
         $negateExists = $operator === '!=' ? 'NOT ' : '';
+        $existsOperator = $operator === '!=' ? '=' : $operator;
 
         switch ($field) {
             case 'host.name':
-                return [
-                    'sql'    => "h.name $comparison ?",
-                    'params' => [$value]
-                ];
+                return $this->buildStringCondition('h.name', $operator, $value);
 
             case 'host.display_name':
-                return [
-                    'sql'    => "h.display_name $comparison ?",
-                    'params' => [$value]
-                ];
+                return $this->buildStringCondition('h.display_name', $operator, $value);
 
             case 'service.name':
                 if ($objectType !== self::TYPE_SERVICE) {
                     return ['sql' => '1 = 0', 'params' => []];
                 }
 
-                return [
-                    'sql'    => "s.name $comparison ?",
-                    'params' => [$value]
-                ];
+                return $this->buildStringCondition('s.name', $operator, $value);
 
             case 'service.display_name':
                 if ($objectType !== self::TYPE_SERVICE) {
                     return ['sql' => '1 = 0', 'params' => []];
                 }
 
-                return [
-                    'sql'    => "s.display_name $comparison ?",
-                    'params' => [$value]
-                ];
+                return $this->buildStringCondition('s.display_name', $operator, $value);
 
             case 'hostgroup.name':
+                $condition = $this->buildStringCondition('hg.name', $existsOperator, $value);
+
                 return [
                     'sql'    => $negateExists . 'EXISTS ('
                         . 'SELECT 1 FROM hostgroup_member hgm'
                         . ' INNER JOIN hostgroup hg ON hg.id = hgm.hostgroup_id'
-                        . " WHERE hgm.host_id = h.id AND hg.name = ?"
+                        . ' WHERE hgm.host_id = h.id AND ' . $condition['sql']
                         . ')',
-                    'params' => [$value]
+                    'params' => $condition['params']
                 ];
 
             case 'hostgroup.display_name':
+                $condition = $this->buildStringCondition('hg.display_name', $existsOperator, $value);
+
                 return [
                     'sql'    => $negateExists . 'EXISTS ('
                         . 'SELECT 1 FROM hostgroup_member hgm'
                         . ' INNER JOIN hostgroup hg ON hg.id = hgm.hostgroup_id'
-                        . " WHERE hgm.host_id = h.id AND hg.display_name = ?"
+                        . ' WHERE hgm.host_id = h.id AND ' . $condition['sql']
                         . ')',
-                    'params' => [$value]
+                    'params' => $condition['params']
                 ];
 
             case 'servicegroup.name':
@@ -961,13 +953,15 @@ class OutageReport extends ReportHook
                     return ['sql' => '1 = 0', 'params' => []];
                 }
 
+                $condition = $this->buildStringCondition('sg.name', $existsOperator, $value);
+
                 return [
                     'sql'    => $negateExists . 'EXISTS ('
                         . 'SELECT 1 FROM servicegroup_member sgm'
                         . ' INNER JOIN servicegroup sg ON sg.id = sgm.servicegroup_id'
-                        . " WHERE sgm.service_id = s.id AND sg.name = ?"
+                        . ' WHERE sgm.service_id = s.id AND ' . $condition['sql']
                         . ')',
-                    'params' => [$value]
+                    'params' => $condition['params']
                 ];
 
             case 'servicegroup.display_name':
@@ -975,17 +969,46 @@ class OutageReport extends ReportHook
                     return ['sql' => '1 = 0', 'params' => []];
                 }
 
+                $condition = $this->buildStringCondition('sg.display_name', $existsOperator, $value);
+
                 return [
                     'sql'    => $negateExists . 'EXISTS ('
                         . 'SELECT 1 FROM servicegroup_member sgm'
                         . ' INNER JOIN servicegroup sg ON sg.id = sgm.servicegroup_id'
-                        . " WHERE sgm.service_id = s.id AND sg.display_name = ?"
+                        . ' WHERE sgm.service_id = s.id AND ' . $condition['sql']
                         . ')',
-                    'params' => [$value]
+                    'params' => $condition['params']
                 ];
         }
 
         return null;
+    }
+
+    /**
+     * @return array{sql: string, params: array<int, string>}
+     */
+    private function buildStringCondition(string $column, string $operator, string $value): array
+    {
+        if (strpos($value, '*') !== false) {
+            $comparison = $operator === '!=' ? 'NOT LIKE' : 'LIKE';
+
+            return [
+                'sql'    => "$column $comparison ? ESCAPE '!'",
+                'params' => [$this->escapeLike($value)]
+            ];
+        }
+
+        $comparison = $operator === '!=' ? '<>' : '=';
+
+        return [
+            'sql'    => "$column $comparison ?",
+            'params' => [$value]
+        ];
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['!', '%', '_', '*'], ['!!', '!%', '!_', '%'], $value);
     }
 
     private function getLimit(array $config): int
